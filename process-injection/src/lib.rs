@@ -9,10 +9,10 @@ use windows_sys::Win32::System::{
     Threading::{CreateRemoteThread, OpenProcess, LPTHREAD_START_ROUTINE, PROCESS_ALL_ACCESS},
 };
 pub fn inject_shellcode(process_name: String, buf: Vec<u8>) -> Result<HANDLE, &'static str> {
-    let h_process: HANDLE;
+    
     let addr: *mut c_void;
 
-    h_process = find_process(process_name)?;
+    let h_process: HANDLE = find_process(process_name)?;
 
     println!("h_process: {:?}", h_process);
     unsafe {
@@ -42,7 +42,7 @@ pub fn inject_shellcode(process_name: String, buf: Vec<u8>) -> Result<HANDLE, &'
                 as *const extern "system" fn(lpthreadparameter: *mut c_void) -> u32),
         );
     }
-    return unsafe {
+    unsafe {
         Ok(CreateRemoteThread(
             h_process,
             ptr::null(),
@@ -52,15 +52,15 @@ pub fn inject_shellcode(process_name: String, buf: Vec<u8>) -> Result<HANDLE, &'
             0,
             ptr::null_mut(),
         ))
-    };
+    }
 }
 
 pub fn inject_dll(process_name: String, file_path: &str) -> Result<HANDLE, &'static str> {
-    let h_process: HANDLE;
+    
     let addr: *mut c_void;
 
     //    1. Find process
-    h_process = find_process(process_name)?;
+    let h_process: HANDLE = find_process(process_name)?;
 
     //2. Allocate some memory
     println!("h_process: {:?}", h_process);
@@ -126,9 +126,9 @@ pub fn inject_dll(process_name: String, file_path: &str) -> Result<HANDLE, &'sta
         )
     };
     if remote_thread_handle == 0 {
-        return Err("Couldn't create remote thread");
+        Err("Couldn't create remote thread")
     } else {
-        return Ok(remote_thread_handle);
+        Ok(remote_thread_handle)
     }
     //    Ok(h_process)
 }
@@ -161,7 +161,7 @@ pub fn find_process(process_name: String) -> Result<HANDLE, &'static str> {
             let mut target_process_name = [0u16; 125];
             unsafe { K32GetModuleBaseNameW(h_process, 0, target_process_name.as_mut_ptr(), 125) };
             //                3. compare the process name
-            if String::from_utf16_lossy(&target_process_name).contains(&process_name.as_str()) {
+            if String::from_utf16_lossy(&target_process_name).contains(process_name.as_str()) {
                 println!("Found process with id: {}", pid);
                 return Ok(h_process);
             } else {
@@ -169,5 +169,5 @@ pub fn find_process(process_name: String) -> Result<HANDLE, &'static str> {
             }
         }
     }
-    return Err("Process not found :-(");
+    Err("Process not found :-(")
 }
