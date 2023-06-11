@@ -444,6 +444,7 @@ pub fn find_process(process_name: String) -> Result<HANDLE, &'static str> {
             //                3. compare the process name
             if String::from_utf16_lossy(&target_process_name).contains(process_name.as_str()) {
                 println!("Found process with id: {}", pid);
+                println!("Process is: {}", String::from_utf16_lossy(&target_process_name));
                 return Ok(h_process);
             } else {
                 unsafe { CloseHandle(h_process) };

